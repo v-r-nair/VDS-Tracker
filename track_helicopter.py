@@ -61,6 +61,7 @@ MISSED_POLLS_BEFORE_ASSUMED_LANDING = 3
 BSKY_HANDLE = os.environ.get("BSKY_HANDLE")
 BSKY_APP_PASSWORD = os.environ.get("BSKY_APP_PASSWORD")
 DRY_RUN = os.environ.get("DRY_RUN", "").lower() in ("1", "true", "yes")
+TEST_POST = os.environ.get("TEST_POST", "").lower() in ("1", "true", "yes")
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +186,15 @@ def fmt_duration(seconds):
 # ---------------------------------------------------------------------------
 
 def main():
+    if TEST_POST:
+        # Manual verification path: confirm Bluesky login/posting works
+        # without needing a real takeoff or landing to happen first.
+        post_to_bluesky(
+            f"🚁 Test post from the {TAIL_NUMBER} tracker — if you can see "
+            f"this, posting is working correctly."
+        )
+        return
+
     state = load_state()
 
     try:
