@@ -39,7 +39,7 @@ ADSB_URL = f"https://api.adsb.one/v2/reg/{quote(TAIL_NUMBER)}"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 # Nominatim's usage policy requires a descriptive User-Agent with contact info.
 # Edit the email below to your own before running this for real.
-HTTP_HEADERS = {"User-Agent": "vtjjl-tracker/1.0 (contact: you@example.com)"}
+HTTP_HEADERS = {"User-Agent": "vtjjl-tracker/1.0 (contact: limiter.tanker2n@icloud.com)"}
 
 # Treated as airborne if reported altitude is above this (feet), or if
 # ground speed is above the speed threshold (covers low hover taxi etc).
