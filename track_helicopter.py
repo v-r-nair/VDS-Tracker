@@ -33,6 +33,7 @@ import requests
 # ---------------------------------------------------------------------------
 
 TAIL_NUMBER = os.environ.get("TAIL_NUMBER", "VT-JJL")
+DISPLAY_NAME = os.environ.get("DISPLAY_NAME", "VDS' Helicopter")
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
 
 # Two independent free ADS-B mirrors, same JSON shape. Some of these
@@ -46,7 +47,7 @@ ADSB_URLS = [
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 # Nominatim's usage policy requires a descriptive User-Agent with contact info.
 # Edit the email below to your own before running this for real.
-HTTP_HEADERS = {"User-Agent": "vtjjl-tracker/1.0 (contact: limiter.tanker2n@icloud.com)"}
+HTTP_HEADERS = {"User-Agent": "vtjjl-tracker/1.0 (contact: limiter.tanker2n@icloud.com"}
 
 # Treated as airborne if reported altitude is above this (feet), or if
 # ground speed is above the speed threshold (covers low hover taxi etc).
@@ -190,7 +191,7 @@ def main():
         # Manual verification path: confirm Bluesky login/posting works
         # without needing a real takeoff or landing to happen first.
         post_to_bluesky(
-            f"🚁 Test post from the {TAIL_NUMBER} tracker — if you can see "
+            f"🚁 Test post from the {DISPLAY_NAME} tracker — if you can see "
             f"this, posting is working correctly."
         )
         return
@@ -216,7 +217,7 @@ def main():
             state["takeoff_time"] = now.isoformat()
             state["takeoff_place"] = place
             state["last_lat"], state["last_lon"] = lat, lon
-            post_to_bluesky(f"🚁 {TAIL_NUMBER} just took off from {place}.")
+            post_to_bluesky(f"🚁 {DISPLAY_NAME} just took off from {place}.")
 
         elif not airborne and state["status"] == "airborne":
             place = reverse_geocode(lat, lon) if lat and lon else "an unknown location"
@@ -226,7 +227,7 @@ def main():
                 duration_txt = f" Flight time: {fmt_duration((now - took_off_at).total_seconds())}."
             from_place = state.get("takeoff_place")
             leg = f" from {from_place}" if from_place else ""
-            post_to_bluesky(f"🚁 {TAIL_NUMBER} just landed at {place}{leg}.{duration_txt}")
+            post_to_bluesky(f"🚁 {DISPLAY_NAME} just landed at {place}{leg}.{duration_txt}")
             state["status"] = "ground"
             state["takeoff_time"] = None
             state["takeoff_place"] = None
@@ -257,7 +258,7 @@ def main():
                 from_place = state.get("takeoff_place")
                 leg = f" from {from_place}" if from_place else ""
                 post_to_bluesky(
-                    f"🚁 {TAIL_NUMBER} appears to have landed near {place}{leg} "
+                    f"🚁 {DISPLAY_NAME} appears to have landed near {place}{leg} "
                     f"(lost signal).{duration_txt}"
                 )
                 state["status"] = "unknown"
