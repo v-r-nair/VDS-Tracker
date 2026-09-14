@@ -2,11 +2,18 @@ name: Track VT-JJL
 
 on:
   schedule:
+    # Every 5 minutes. GitHub may delay this under load; treat it as
+    # "roughly every 5 min", not exact.
     - cron: "*/5 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test_post:
+        description: "Send a test post to Bluesky instead of checking the aircraft"
+        type: boolean
+        default: false
 
 permissions:
-  contents: write
+  contents: write   # needed to commit state.json back to the repo
 
 concurrency:
   group: vtjjl-tracker
@@ -30,6 +37,7 @@ jobs:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           TAIL_NUMBER: "VT-JJL"
+          TEST_POST: ${{ inputs.test_post }}
         run: python track_helicopter.py
 
       - name: Commit updated state
