@@ -11,12 +11,12 @@ Runs once per invocation (meant to be triggered on a schedule, e.g. every
   4. Posts to Bluesky if so.
   5. Saves the updated state.json.
 
-Data source: https://api.adsb.one (free, no key, mirrors the ADS-B
-Exchange v2 JSON format: GET /v2/reg/<registration>). Coverage depends on
-volunteer ADS-B receivers, so low-altitude helicopter legs in
-receiver-sparse areas may not always be caught -- see README for notes
-and for swapping in a paid source (ADS-B Exchange via RapidAPI) if you
-need better reliability.
+Data source: tries multiple free ADS-B mirrors (no key needed) that
+mirror the ADS-B Exchange v2 JSON format: GET /v2/reg/<registration>.
+Coverage depends on volunteer ADS-B receivers, so low-altitude helicopter
+legs in receiver-sparse areas may not always be caught -- see README for
+notes and for swapping in a paid source (ADS-B Exchange via RapidAPI) if
+you need better reliability.
 """
 
 import json
@@ -35,7 +35,14 @@ import requests
 TAIL_NUMBER = os.environ.get("TAIL_NUMBER", "VT-JJL")
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
 
-ADSB_URL = f"https://api.adsb.one/v2/reg/{quote(TAIL_NUMBER)}"
+# Two independent free ADS-B mirrors, same JSON shape. Some of these
+# services block traffic from cloud/datacenter IP ranges (which is what
+# GitHub Actions runs on) even with a proper User-Agent set, so we try
+# more than one and use whichever responds.
+ADSB_URLS = [
+    f"https://api.adsb.one/v2/reg/{quote(TAIL_NUMBER)}",
+    f"https://api.adsb.lol/v2/reg/{quote(TAIL_NUMBER)}",
+]
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 # Nominatim's usage policy requires a descriptive User-Agent with contact info.
 # Edit the email below to your own before running this for real.
@@ -86,14 +93,24 @@ def save_state(state):
 # ---------------------------------------------------------------------------
 
 def fetch_aircraft():
-    """Return the aircraft dict from the feed, or None if not currently seen."""
-    resp = requests.get(ADSB_URL, headers=HTTP_HEADERS, timeout=20)
-    resp.raise_for_status()
-    data = resp.json()
-    ac_list = data.get("ac") or []
-    if not ac_list:
-        return None
-    return ac_list[0]
+    """Return the aircraft dict from the feed, or None if not currently seen.
+
+    Tries each configured mirror in turn and uses the first one that
+    responds successfully. Raises the last error if every mirror fails.
+    """
+    last_error = None
+    for url in ADSB_URLS:
+        try:
+            resp = requests.get(url, headers=HTTP_HEADERS, timeout=20)
+            resp.raise_for_status()
+            data = resp.json()
+            ac_list = data.get("ac") or []
+            print(f"OK: {url} -> {len(ac_list)} aircraft")
+            return ac_list[0] if ac_list else None
+        except requests.RequestException as e:
+            print(f"Mirror failed ({url}): {e}", file=sys.stderr)
+            last_error = e
+    raise last_error
 
 
 def is_airborne(ac):
