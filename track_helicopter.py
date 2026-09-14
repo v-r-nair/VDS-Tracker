@@ -254,7 +254,13 @@ def main():
                 state["takeoff_time"] = None
                 state["takeoff_place"] = None
                 state["missed_polls"] = 0
-        # If it was on the ground or unknown and still isn't seen, nothing to do.
+        elif state["status"] == "unknown":
+            # No prior sighting to compare against -- not seen at all is
+            # far more likely to mean "parked" than "airborne but hidden",
+            # so start the state machine from "ground" rather than staying
+            # stuck at "unknown" forever.
+            state["status"] = "ground"
+        # If it was already "ground" and still isn't seen, nothing to do.
 
     save_state(state)
 
