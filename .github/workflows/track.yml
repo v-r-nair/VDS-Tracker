@@ -37,6 +37,7 @@ jobs:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           TAIL_NUMBER: "VT-JJL"
+          DISPLAY_NAME: "VDS' Helicopter"
           TEST_POST: ${{ inputs.test_post }}
         run: python track_helicopter.py
 
