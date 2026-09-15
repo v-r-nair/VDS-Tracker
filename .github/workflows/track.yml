@@ -2,9 +2,13 @@ name: Track VT-JJL
 
 on:
   schedule:
-    # Every 5 minutes. GitHub may delay this under load; treat it as
-    # "roughly every 5 min", not exact.
-    - cron: "*/5 * * * *"
+    # GitHub's own 5-minute scheduling was unreliable in practice (runs
+    # silently skipped or fired hours late). Instead, each run below stays
+    # alive and polls internally every 5 minutes for ~5h40m, so GitHub only
+    # needs to successfully start a job roughly once every 5 hours -- far
+    # less prone to being dropped. Consecutive runs overlap by ~40 minutes
+    # as a buffer against scheduling delays.
+    - cron: "0 */5 * * *"
   workflow_dispatch:
     inputs:
       test_post:
@@ -22,6 +26,7 @@ concurrency:
 jobs:
   poll:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +42,7 @@ jobs:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           TAIL_NUMBER: "VT-JJL"
-          DISPLAY_NAME: "VDS' Helicopter"
+          DISPLAY_NAME: "VDS' helicopter"
           TEST_POST: ${{ inputs.test_post }}
         run: python track_helicopter.py
 
