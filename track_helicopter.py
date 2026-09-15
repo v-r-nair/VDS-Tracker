@@ -2,14 +2,14 @@
 """
 VT-JJL trip tracker -> Bluesky poster.
 
-Runs once per invocation (meant to be triggered on a schedule, e.g. every
-5 minutes by GitHub Actions). Each run:
+Runs continuously for several hours per invocation (started on a schedule
+by GitHub Actions, roughly every 5 hours), polling every 5 minutes inside
+that window. Each poll:
 
-  1. Loads state.json (what we last knew about the aircraft).
-  2. Polls a free ADS-B mirror for the aircraft's current position.
-  3. Decides whether a takeoff or landing happened since the last run.
-  4. Posts to Bluesky if so.
-  5. Saves the updated state.json.
+  1. Checks a free ADS-B mirror for the aircraft's current position.
+  2. Decides whether a takeoff or landing happened since the last poll.
+  3. Posts to Bluesky if so.
+  4. Saves and commits the updated state.json.
 
 Data source: tries multiple free ADS-B mirrors (no key needed) that
 mirror the ADS-B Exchange v2 JSON format: GET /v2/reg/<registration>.
@@ -21,6 +21,7 @@ you need better reliability.
 
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -33,7 +34,7 @@ import requests
 # ---------------------------------------------------------------------------
 
 TAIL_NUMBER = os.environ.get("TAIL_NUMBER", "VT-JJL")
-DISPLAY_NAME = os.environ.get("DISPLAY_NAME", "VDS' Helicopter")
+DISPLAY_NAME = os.environ.get("DISPLAY_NAME", "VDS' helicopter")
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
 
 # Two independent free ADS-B mirrors, same JSON shape. Some of these
@@ -47,7 +48,7 @@ ADSB_URLS = [
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 # Nominatim's usage policy requires a descriptive User-Agent with contact info.
 # Edit the email below to your own before running this for real.
-HTTP_HEADERS = {"User-Agent": "vtjjl-tracker/1.0 (contact: limiter.tanker2n@icloud.com"}
+HTTP_HEADERS = {"User-Agent": "vtjjl-tracker/1.0 (contact: limiter.tanker2n@icloud.com)"}
 
 # Treated as airborne if reported altitude is above this (feet), or if
 # ground speed is above the speed threshold (covers low hover taxi etc).
@@ -183,26 +184,21 @@ def fmt_duration(seconds):
 
 
 # ---------------------------------------------------------------------------
-# Main
+# One polling cycle
 # ---------------------------------------------------------------------------
 
-def main():
-    if TEST_POST:
-        # Manual verification path: confirm Bluesky login/posting works
-        # without needing a real takeoff or landing to happen first.
-        post_to_bluesky(
-            f"🚁 Test post from the {DISPLAY_NAME} tracker — if you can see "
-            f"this, posting is working correctly."
-        )
-        return
+def poll_once(state):
+    """Check the aircraft once, update state, post to Bluesky if needed.
 
-    state = load_state()
-
+    Never raises for a failed fetch -- transient network hiccups during a
+    long-running loop shouldn't kill the whole job. Returns the (possibly
+    updated) state dict.
+    """
     try:
         ac = fetch_aircraft()
     except requests.RequestException as e:
-        print(f"ADS-B fetch failed: {e}", file=sys.stderr)
-        return
+        print(f"ADS-B fetch failed (will retry next poll): {e}", file=sys.stderr)
+        return state
 
     now = datetime.now(timezone.utc)
 
@@ -273,7 +269,66 @@ def main():
             state["status"] = "ground"
         # If it was already "ground" and still isn't seen, nothing to do.
 
-    save_state(state)
+    return state
+
+
+def commit_state():
+    """Best-effort commit+push of state.json. Never raises -- if this fails,
+    the next poll (or the workflow's own final commit step) will catch up."""
+    try:
+        subprocess.run(["git", "config", "user.name", "vtjjl-tracker-bot"], check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "actions@users.noreply.github.com"],
+            check=True,
+        )
+        subprocess.run(["git", "add", STATE_FILE], check=True)
+        diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
+        if diff.returncode != 0:
+            subprocess.run(["git", "commit", "-m", "Update tracker state [skip ci]"], check=True)
+            subprocess.run(["git", "push"], check=True)
+    except Exception as e:
+        print(f"Commit failed, will retry next poll: {e}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+# How long a single job keeps polling before exiting (GitHub Actions hard-caps
+# a job at 6 hours; this leaves headroom for setup/teardown steps).
+LOOP_DURATION_MINUTES = float(os.environ.get("LOOP_DURATION_MINUTES", "340"))
+POLL_INTERVAL_SECONDS = int(os.environ.get("POLL_INTERVAL_SECONDS", "300"))
+
+
+def run_loop():
+    state = load_state()
+    deadline = time.monotonic() + LOOP_DURATION_MINUTES * 60
+    poll_count = 0
+
+    while True:
+        state = poll_once(state)
+        save_state(state)
+        commit_state()
+        poll_count += 1
+
+        remaining = deadline - time.monotonic()
+        if remaining <= POLL_INTERVAL_SECONDS:
+            print(f"Loop ending after {poll_count} polls (time budget used up).")
+            break
+        time.sleep(POLL_INTERVAL_SECONDS)
+
+
+def main():
+    if TEST_POST:
+        # Manual verification path: confirm Bluesky login/posting works
+        # without needing a real takeoff or landing to happen first.
+        post_to_bluesky(
+            f"🚁 Test post from the {DISPLAY_NAME} tracker — if you can see "
+            f"this, posting is working correctly."
+        )
+        return
+
+    run_loop()
 
 
 if __name__ == "__main__":
