@@ -2,8 +2,8 @@
   "status": "airborne",
   "last_lat": 10.116267,
   "last_lon": 76.286316,
-  "missed_polls": 0,
+  "missed_polls": 1,
   "takeoff_time": "2026-09-20T11:12:24.195203+00:00",
   "takeoff_place": "Kongorpilly, Kerala",
-  "updated_at": "2026-09-20T11:12:26.360197+00:00"
+  "updated_at": "2026-09-20T11:17:28.083196+00:00"
 }
