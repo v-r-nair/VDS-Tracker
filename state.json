@@ -1,9 +1,9 @@
 {
-  "status": "unknown",
+  "status": "ground",
   "last_lat": 10.116267,
   "last_lon": 76.286316,
   "missed_polls": 0,
   "takeoff_time": null,
   "takeoff_place": null,
-  "updated_at": "2026-09-20T11:27:32.494678+00:00"
+  "updated_at": "2026-09-20T11:32:34.250711+00:00"
 }
